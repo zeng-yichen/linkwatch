@@ -31,12 +31,36 @@ The API will be available at http://localhost:8080.
 
 ### Docker (Optional)
 
-You can also run the service using Docker:
+You can also run the service using Docker. **Important**: Docker containers are ephemeral, so you need to use volumes to persist the database between container restarts.
 
+#### Quick Start (Data will be lost on container restart):
 ```bash
 docker build -t linkwatch .
 docker run -p 8080:8080 linkwatch
 ```
+
+#### With Persistent Storage (Recommended):
+```bash
+# Build the image
+docker build -t linkwatch .
+
+# Create a volume for persistent data
+docker volume create linkwatch-data
+
+# Run with persistent storage
+docker run -p 8080:8080 -v linkwatch-data:/app/data linkwatch
+```
+
+#### Using Docker Compose (Easiest):
+```bash
+# Start with persistent storage
+docker-compose up
+
+# Stop the service
+docker-compose down
+```
+
+**Note**: The database file is stored in `/app/data` inside the container. Without volume mounting, your data will be lost when the container stops.
 
 ## Configuration
 
@@ -50,6 +74,8 @@ The service is configured via environment variables. The following variables are
 | MAX_CONCURRENCY | The max number of concurrent URL checks. | 8 |
 | HTTP_TIMEOUT | The timeout for each individual HTTP check. | 5s |
 | SHUTDOWN_GRACE | The grace period for shutdown. | 10s |
+
+**Note**: When running in Docker, the database file is stored in `/app/data` inside the container. Use volume mounting to persist data between container restarts.
 
 ## API Usage
 

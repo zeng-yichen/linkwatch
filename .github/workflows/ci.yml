@@ -61,6 +61,19 @@ jobs:
     - name: Build Docker image
       run: docker build -t linkwatch:test .
 
+    - name: Verify Docker Compose
+      run: |
+        # Check if docker compose (integrated) is available
+        docker compose version || echo "Docker Compose not available, trying standalone version"
+        
+        # If not available, install standalone docker-compose
+        if ! docker compose version >/dev/null 2>&1; then
+          echo "Installing standalone docker-compose..."
+          sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose --version
+        fi
+
     - name: Test Docker image (Basic)
       run: |
         # Start container in background
@@ -103,8 +116,17 @@ jobs:
 
     - name: Test Docker Compose
       run: |
-        # Start with docker-compose
-        docker-compose up -d
+        # Try docker compose (integrated) first, fallback to docker-compose (standalone)
+        if docker compose version >/dev/null 2>&1; then
+          echo "Using integrated docker compose"
+          COMPOSE_CMD="docker compose"
+        else
+          echo "Using standalone docker-compose"
+          COMPOSE_CMD="docker-compose"
+        fi
+        
+        # Start with docker compose
+        $COMPOSE_CMD up -d
         
         # Wait for service to start
         sleep 20
@@ -121,5 +143,5 @@ jobs:
         # Test listing targets
         curl -f http://localhost:8080/v1/targets || exit 1
         
-        # Stop docker-compose
-        docker-compose down -v
+        # Stop docker compose
+        $COMPOSE_CMD down -v

@@ -10,20 +10,20 @@ import (
 	"strings"
 	"time"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // SQLite driver for database/sql
 
 	"linkwatch/internal/models"
 	"linkwatch/internal/storage"
 )
 
-// SQLiteStore implements the storage.Storer interface for SQLite.
-type SQLiteStore struct {
+// Store implements the storage.Storer interface for SQLite.
+type Store struct {
 	db *sql.DB
 }
 
-// New creates a new SQLiteStore and establishes a connection to the database file.
+// New creates a new Store and establishes a connection to the database file.
 // It also runs migrations to ensure the schema is up to date.
-func New(ctx context.Context, dataSourceName string) (*SQLiteStore, error) {
+func New(ctx context.Context, dataSourceName string) (*Store, error) {
 	db, err := sql.Open("sqlite", fmt.Sprintf("%s?_foreign_keys=on&_journal_mode=WAL", dataSourceName))
 	if err != nil {
 		return nil, fmt.Errorf("unable to open sqlite database: %w", err)
@@ -32,7 +32,7 @@ func New(ctx context.Context, dataSourceName string) (*SQLiteStore, error) {
 		db.Close()
 		return nil, fmt.Errorf("unable to ping database: %w", err)
 	}
-	store := &SQLiteStore{db: db}
+	store := &Store{db: db}
 	if err := store.migrate(ctx); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
@@ -41,10 +41,10 @@ func New(ctx context.Context, dataSourceName string) (*SQLiteStore, error) {
 }
 
 // Close closes the database connection.
-func (s *SQLiteStore) Close() error { return s.db.Close() }
+func (s *Store) Close() error { return s.db.Close() }
 
 // migrate ensures the database schema is created.
-func (s *SQLiteStore) migrate(ctx context.Context) error {
+func (s *Store) migrate(ctx context.Context) error {
 	schema := `
 CREATE TABLE IF NOT EXISTS targets (
 	id            TEXT PRIMARY KEY,
@@ -87,7 +87,7 @@ func randomID(prefix string) string {
 }
 
 // CreateTarget saves a new target, handling idempotency.
-func (s *SQLiteStore) CreateTarget(ctx context.Context, target *models.Target, idempotencyKey *string) (*models.Target, error) {
+func (s *Store) CreateTarget(ctx context.Context, target *models.Target, idempotencyKey *string) (*models.Target, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not begin transaction: %w", err)
@@ -141,7 +141,7 @@ ON CONFLICT(canonical_url) DO NOTHING`
 }
 
 // getTargetByIDTx retrieves a target within a transaction.
-func (s *SQLiteStore) getTargetByIDTx(ctx context.Context, tx *sql.Tx, id string) (*models.Target, error) {
+func (s *Store) getTargetByIDTx(ctx context.Context, tx *sql.Tx, id string) (*models.Target, error) {
 	query := `SELECT id, url, canonical_url, host, created_at FROM targets WHERE id = ?`
 	var t models.Target
 	var createdAtStr string
@@ -157,7 +157,7 @@ func (s *SQLiteStore) getTargetByIDTx(ctx context.Context, tx *sql.Tx, id string
 }
 
 // GetTargetByID retrieves a single target by its unique ID.
-func (s *SQLiteStore) GetTargetByID(ctx context.Context, id string) (*models.Target, error) {
+func (s *Store) GetTargetByID(ctx context.Context, id string) (*models.Target, error) {
 	query := `SELECT id, url, canonical_url, host, created_at FROM targets WHERE id = ?`
 	var t models.Target
 	var createdAtStr string
@@ -173,7 +173,7 @@ func (s *SQLiteStore) GetTargetByID(ctx context.Context, id string) (*models.Tar
 }
 
 // ListTargets retrieves a paginated list of targets.
-func (s *SQLiteStore) ListTargets(ctx context.Context, params storage.ListTargetsParams) ([]models.Target, error) {
+func (s *Store) ListTargets(ctx context.Context, params storage.ListTargetsParams) ([]models.Target, error) {
 	var args []interface{}
 	qb := strings.Builder{}
 	qb.WriteString("SELECT id, url, canonical_url, host, created_at FROM targets WHERE 1=1")
@@ -207,7 +207,7 @@ func (s *SQLiteStore) ListTargets(ctx context.Context, params storage.ListTarget
 }
 
 // GetAllTargets retrieves all targets from the database.
-func (s *SQLiteStore) GetAllTargets(ctx context.Context) ([]models.Target, error) {
+func (s *Store) GetAllTargets(ctx context.Context) ([]models.Target, error) {
 	query := `SELECT id, url, canonical_url, host, created_at FROM targets ORDER BY created_at, id`
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
@@ -228,7 +228,7 @@ func (s *SQLiteStore) GetAllTargets(ctx context.Context) ([]models.Target, error
 }
 
 // CreateCheckResult saves a new check result to the database.
-func (s *SQLiteStore) CreateCheckResult(ctx context.Context, result *models.CheckResult) error {
+func (s *Store) CreateCheckResult(ctx context.Context, result *models.CheckResult) error {
 	if result.ID == "" {
 		result.ID = randomID("cr_")
 	}
@@ -241,7 +241,7 @@ func (s *SQLiteStore) CreateCheckResult(ctx context.Context, result *models.Chec
 }
 
 // ListCheckResultsByTargetID retrieves recent check results for a target.
-func (s *SQLiteStore) ListCheckResultsByTargetID(ctx context.Context, params storage.ListCheckResultsParams) ([]models.CheckResult, error) {
+func (s *Store) ListCheckResultsByTargetID(ctx context.Context, params storage.ListCheckResultsParams) ([]models.CheckResult, error) {
 	args := []interface{}{params.TargetID}
 	qb := strings.Builder{}
 	qb.WriteString("SELECT id, target_id, checked_at, status_code, latency_ms, error FROM check_results WHERE target_id = ?")

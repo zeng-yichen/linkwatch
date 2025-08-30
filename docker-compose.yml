@@ -1,0 +1,23 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - HTTP_PORT=8080
+      - DATABASE_URL=linkwatch.db
+      - CHECK_INTERVAL=15s
+      - MAX_CONCURRENCY=8
+      - HTTP_TIMEOUT=5s
+      - SHUTDOWN_GRACE=10s
+    # Note: Volume mounting removed for CI testing to avoid scratch image limitations
+    # In production, you would mount a volume for persistence
+    restart: unless-stopped
+    # Note: Healthcheck removed as it requires curl which is not available in scratch image
+    # The service will be considered healthy if it starts successfully
+
+# Note: Volumes section removed for CI testing
+# In production, you would add:
+# volumes:
+#   linkwatch_data:
+#     driver: local

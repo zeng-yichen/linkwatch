@@ -13,6 +13,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 
 // Simple in-memory storage for testing
 type testStore struct {
+	mu          sync.RWMutex
 	targets     map[string]models.Target
 	results     map[string][]models.CheckResult
 	idempotency map[string]string
@@ -43,6 +45,9 @@ func newTestStore() *testStore {
 }
 
 func (s *testStore) CreateTarget(ctx context.Context, target *models.Target, idempotencyKey *string) (*models.Target, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// Check idempotency key first
 	if idempotencyKey != nil {
 		if targetID, ok := s.idempotency[*idempotencyKey]; ok {
@@ -69,6 +74,9 @@ func (s *testStore) CreateTarget(ctx context.Context, target *models.Target, ide
 }
 
 func (s *testStore) GetTargetByID(ctx context.Context, id string) (*models.Target, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	if t, ok := s.targets[id]; ok {
 		return &t, nil
 	}
@@ -76,6 +84,9 @@ func (s *testStore) GetTargetByID(ctx context.Context, id string) (*models.Targe
 }
 
 func (s *testStore) ListTargets(ctx context.Context, params storage.ListTargetsParams) ([]models.Target, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	var targets []models.Target
 	for _, t := range s.targets {
 		// Host filtering
@@ -111,6 +122,9 @@ func (s *testStore) ListTargets(ctx context.Context, params storage.ListTargetsP
 }
 
 func (s *testStore) GetAllTargets(ctx context.Context) ([]models.Target, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	var targets []models.Target
 	for _, t := range s.targets {
 		targets = append(targets, t)
@@ -119,11 +133,17 @@ func (s *testStore) GetAllTargets(ctx context.Context) ([]models.Target, error) 
 }
 
 func (s *testStore) CreateCheckResult(ctx context.Context, result *models.CheckResult) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.results[result.TargetID] = append(s.results[result.TargetID], *result)
 	return nil
 }
 
 func (s *testStore) ListCheckResultsByTargetID(ctx context.Context, params storage.ListCheckResultsParams) ([]models.CheckResult, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	results, ok := s.results[params.TargetID]
 	if !ok {
 		return []models.CheckResult{}, nil
@@ -1385,11 +1405,12 @@ func TestHTTPTimeout(t *testing.T) {
 // TestRedirectHandling tests the redirect following behavior
 func TestRedirectHandling(t *testing.T) {
 	store := newTestStore()
+	checkInterval := 100 * time.Millisecond
 	maxConcurrency := 1
 	httpTimeout := 5 * time.Second
 
-	pool := checker.NewWorkerPool(store, maxConcurrency, httpTimeout)
-	defer pool.Stop()
+	checkerSvc := checker.New(store, checkInterval, maxConcurrency, httpTimeout)
+	defer checkerSvc.Stop()
 
 	t.Run("redirect configuration", func(t *testing.T) {
 		// Test that the HTTP client is configured to follow redirects
@@ -1400,9 +1421,17 @@ func TestRedirectHandling(t *testing.T) {
 			URL:          "https://httpbin.org/status/200",
 			CanonicalURL: "https://httpbin.org/status/200",
 			Host:         "httpbin.org",
+			CreatedAt:    time.Now().UTC(),
 		}
 
-		pool.Submit(target)
+		// Store the target first
+		_, err := store.CreateTarget(context.Background(), &target, nil)
+		if err != nil {
+			t.Fatalf("failed to create target: %v", err)
+		}
+
+		// Start the background checker
+		checkerSvc.Start()
 
 		// Wait for processing
 		time.Sleep(3 * time.Second)
@@ -1427,11 +1456,12 @@ func TestRedirectHandling(t *testing.T) {
 // TestLatencyMeasurement tests that latency is properly measured and recorded
 func TestLatencyMeasurement(t *testing.T) {
 	store := newTestStore()
+	checkInterval := 100 * time.Millisecond
 	maxConcurrency := 1
 	httpTimeout := 5 * time.Second
 
-	pool := checker.NewWorkerPool(store, maxConcurrency, httpTimeout)
-	defer pool.Stop()
+	checkerSvc := checker.New(store, checkInterval, maxConcurrency, httpTimeout)
+	defer checkerSvc.Stop()
 
 	t.Run("latency recording", func(t *testing.T) {
 		// Target for latency testing
@@ -1440,9 +1470,17 @@ func TestLatencyMeasurement(t *testing.T) {
 			URL:          "https://httpbin.org/status/200",
 			CanonicalURL: "https://httpbin.org/status/200",
 			Host:         "httpbin.org",
+			CreatedAt:    time.Now().UTC(),
 		}
 
-		pool.Submit(target)
+		// Store the target first
+		_, err := store.CreateTarget(context.Background(), &target, nil)
+		if err != nil {
+			t.Fatalf("failed to create target: %v", err)
+		}
+
+		// Start the background checker
+		checkerSvc.Start()
 
 		// Wait for processing
 		time.Sleep(3 * time.Second)

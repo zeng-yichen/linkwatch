@@ -24,7 +24,7 @@ type SQLiteStore struct {
 // New creates a new SQLiteStore and establishes a connection to the database file.
 // It also runs migrations to ensure the schema is up to date.
 func New(ctx context.Context, dataSourceName string) (*SQLiteStore, error) {
-	db, err := sql.Open("sqlite3", fmt.Sprintf("%s?_foreign_keys=on&_journal_mode=WAL", dataSourceName))
+	db, err := sql.Open("sqlite", fmt.Sprintf("%s?_foreign_keys=on&_journal_mode=WAL", dataSourceName))
 	if err != nil {
 		return nil, fmt.Errorf("unable to open sqlite database: %w", err)
 	}

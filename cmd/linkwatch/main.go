@@ -10,8 +10,6 @@ import (
 	"linkwatch/internal/api"
 	"linkwatch/internal/checker"
 	"linkwatch/internal/config"
-	"linkwatch/internal/storage"
-	"linkwatch/internal/storage/postgres"
 	"linkwatch/internal/storage/sqlite"
 )
 
@@ -34,33 +32,13 @@ func run() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	// Initialize the storage layer based on configuration.
-	log.Println("initializing database connection...")
-	var store storage.Storer
-	var closeFn func() error
-
-	if cfg.DatabaseDriver == "postgres" {
-		postgresStore, err := postgres.New(ctx, cfg.DatabaseURL)
-		if err != nil {
-			return fmt.Errorf("failed to initialize postgres storage: %w", err)
-		}
-		store = postgresStore
-		closeFn = func() error { postgresStore.Close(); return nil }
-	} else {
-		// Default to SQLite
-		sqliteStore, err := sqlite.New(ctx, cfg.DatabaseURL)
-		if err != nil {
-			return fmt.Errorf("failed to initialize sqlite storage: %w", err)
-		}
-		store = sqliteStore
-		closeFn = sqliteStore.Close
+	// Initialize the SQLite storage layer.
+	log.Println("initializing SQLite database connection...")
+	store, err := sqlite.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("failed to initialize sqlite storage: %w", err)
 	}
-
-	defer func() {
-		if closeFn != nil {
-			closeFn()
-		}
-	}()
+	defer store.Close()
 	log.Println("database connection successful")
 
 	// Initialize the background checker and the API server.

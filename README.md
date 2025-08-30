@@ -54,9 +54,13 @@ docker run -p 8080:8080 -v linkwatch-data:/app/data linkwatch
 #### Using Docker Compose (Easiest):
 ```bash
 # Start with persistent storage
+docker compose up
+# OR (for older Docker installations)
 docker-compose up
 
 # Stop the service
+docker compose down
+# OR (for older Docker installations)
 docker-compose down
 ```
 

@@ -53,7 +53,7 @@ docker run -p 8080:8080 -v linkwatch-data:/app/data linkwatch
 
 #### Using Docker Compose (Easiest):
 ```bash
-# Start with persistent storage
+# Start the service
 docker compose up
 # OR (for older Docker installations)
 docker-compose up
@@ -62,9 +62,14 @@ docker-compose up
 docker compose down
 # OR (for older Docker installations)
 docker-compose down
+
+# For production with persistent storage, modify docker-compose.yml to add:
+# volumes:
+#   - linkwatch_data:/app/data
+# And uncomment the volumes section at the bottom
 ```
 
-**Note**: The database file is stored in `/app/data` inside the container. Without volume mounting, your data will be lost when the container stops.
+**Note**: The database file is stored in `linkwatch.db` inside the container. For production use with persistent storage, modify the docker-compose.yml file to add volume mounting.
 
 ## Configuration
 
@@ -79,7 +84,7 @@ The service is configured via environment variables. The following variables are
 | HTTP_TIMEOUT | The timeout for each individual HTTP check. | 5s |
 | SHUTDOWN_GRACE | The grace period for shutdown. | 10s |
 
-**Note**: When running in Docker, the database file is stored in `/app/data` inside the container. Use volume mounting to persist data between container restarts.
+**Note**: When running in Docker, the database file is stored in `linkwatch.db` inside the container. For production use, modify docker-compose.yml to add volume mounting for persistence.
 
 ## API Usage
 

@@ -116,6 +116,12 @@ jobs:
 
     - name: Test Docker Compose
       run: |
+        # Debug: Check current directory and files
+        pwd
+        ls -la
+        echo "Checking for docker-compose.yml:"
+        ls -la docker-compose.yml || echo "docker-compose.yml not found"
+        
         # Try docker compose (integrated) first, fallback to docker-compose (standalone)
         if docker compose version >/dev/null 2>&1; then
           echo "Using integrated docker compose"
@@ -124,6 +130,10 @@ jobs:
           echo "Using standalone docker-compose"
           COMPOSE_CMD="docker-compose"
         fi
+        
+        # Show docker compose configuration
+        echo "Docker Compose configuration:"
+        $COMPOSE_CMD config
         
         # Start with docker compose
         $COMPOSE_CMD up -d
@@ -144,4 +154,4 @@ jobs:
         curl -f http://localhost:8080/v1/targets || exit 1
         
         # Stop docker compose
-        $COMPOSE_CMD down -v
+        $COMPOSE_CMD down

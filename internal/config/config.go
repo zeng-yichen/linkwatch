@@ -8,7 +8,6 @@ import (
 
 // Config holds the application's configuration values.
 type Config struct {
-	DatabaseDriver string
 	DatabaseURL    string
 	CheckInterval  time.Duration
 	MaxConcurrency int
@@ -20,7 +19,6 @@ type Config struct {
 // Load loads configuration from environment variables with sane defaults.
 func Load() *Config {
 	return &Config{
-		DatabaseDriver: getEnv("DATABASE_DRIVER", "sqlite"),
 		DatabaseURL:    getEnv("DATABASE_URL", "linkwatch.db"),
 		CheckInterval:  getEnvDuration("CHECK_INTERVAL", 15*time.Second),
 		MaxConcurrency: getEnvInt("MAX_CONCURRENCY", 8),

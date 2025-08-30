@@ -11,7 +11,10 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o /linkwatch ./cmd/linkwatch
 
-FROM scratch
+FROM alpine:latest
+
+# Install ca-certificates for HTTPS requests
+RUN apk --no-cache add ca-certificates
 
 COPY --from=builder /linkwatch /linkwatch
 
